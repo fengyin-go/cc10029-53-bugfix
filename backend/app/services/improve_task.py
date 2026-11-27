@@ -18,7 +18,7 @@ class ImproveTaskService(BaseModuleService):
     NEGATIVE_ACTIONS = []
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
-        """创建诊改任务：承接方案引用必须是已审核通过的改进方案。"""
+        """创建诊改任务：承接方案引用必须是仍持有承接资格、且无争议的改进方案。"""
         source_plan = str(values.get("承接方案", "") or "").strip()
 
         # 尝试解析方案ID引用
@@ -26,12 +26,20 @@ class ImproveTaskService(BaseModuleService):
             plan_id_str = source_plan.split(":", 1)[1]
             try:
                 plan_id = int(plan_id_str)
-                check_entity_status(
+            except ValueError:
+                plan_id = None  # 非数字ID不阻止创建
+            if plan_id is not None:
+                # 核对关联方案是否仍有承接资格（校验失败必须拦住登记）
+                plan = check_entity_status(
                     "improve_plan", plan_id, ["审核通过"],
                     "诊改任务的承接方案"
                 )
-            except ValueError:
-                pass
+                # 处于争议（如试卷退回冻结待复核）的材料不能派出新任务
+                if plan.get("abnormal"):
+                    raise ValueError(
+                        f"跨模块校验失败：诊改任务的承接方案 improve_plan #{plan_id} "
+                        f"处于争议处理中，不能派出新任务"
+                    )
 
         return super().create_entry(values)
 

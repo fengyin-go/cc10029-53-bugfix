@@ -85,7 +85,11 @@ def get_entry(module: str, entry_id: int) -> dict[str, Any]:
 @router.post("/{module}", response_model=ActionResult)
 def create_entry(module: str, payload: EntryPayload) -> ActionResult:
     service = require_service(module)
-    entry, missing = service.create_entry(payload.values)
+    try:
+        entry, missing = service.create_entry(payload.values)
+    except ValueError as exc:
+        # 领域校验（如跨模块承接资格核对）未通过：原样返回拒绝原因
+        return ActionResult(ok=False, message=str(exc))
     if missing:
         return ActionResult(ok=False, message=f"缺少必填字段：{'、'.join(missing)}")
     return ActionResult(ok=True, message=f"{service.ENTITY}已登记", entry=entry)

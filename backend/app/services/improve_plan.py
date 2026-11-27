@@ -30,13 +30,14 @@ class ImprovePlanService(BaseModuleService):
             fb_id_str = feedback_ref.split(":", 1)[1]
             try:
                 fb_id = int(fb_id_str)
-                # 验证反馈存在且已签收
+            except ValueError:
+                fb_id = None  # 非数字ID不阻止创建
+            if fb_id is not None:
+                # 验证反馈存在且已签收（校验失败必须拦住登记）
                 check_entity_status(
                     "feedback", fb_id, ["已签收", "已办结"],
                     "改进方案的关联反馈"
                 )
-            except ValueError:
-                pass  # 非数字ID不阻止创建
 
         return super().create_entry(values)
 
